@@ -48,7 +48,6 @@ spec:
 
     stages {
 
-        /* --------------------- DEBUG WORKSPACE --------------------- */
         stage('Check Workspace Structure') {
             steps {
                 sh '''
@@ -58,23 +57,11 @@ spec:
             }
         }
 
-        /* --------------------- FIX SPARSE CHECKOUT --------------------- */
-        stage('Fix Sparse Checkout') {
-            steps {
-                sh '''
-                    echo "Disabling sparse checkout if enabled..."
-                    git config core.sparsecheckout false || true
-                    git checkout .
-                '''
-            }
-        }
-
-        /* --------------------- FRONTEND BUILD --------------------- */
         stage('Install + Build Frontend') {
             steps {
                 container('node') {
                     sh '''
-                        cd travelstory-frontend
+                        cd frontend
                         npm install
                         npm run build
                     '''
@@ -82,24 +69,22 @@ spec:
             }
         }
 
-        /* --------------------- DOCKER BUILD --------------------- */
         stage('Build Docker Image') {
             steps {
                 container('dind') {
                     sh '''
                         sleep 10
-                        docker build -t travelstory-frontend:latest ./travelstory-frontend
+                        docker build -t travelstory-frontend:latest ./frontend
                     '''
                 }
             }
         }
 
-        /* --------------------- SONAR SCAN --------------------- */
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
                     sh '''
-                        cd travelstory-frontend
+                        cd frontend
                         sonar-scanner \
                             -Dsonar.projectKey=Travel-Story \
                             -Dsonar.sources=. \
@@ -110,7 +95,6 @@ spec:
             }
         }
 
-        /* --------------------- NEXUS LOGIN --------------------- */
         stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
@@ -122,7 +106,6 @@ spec:
             }
         }
 
-        /* --------------------- PUSH IMAGE --------------------- */
         stage('Push to Nexus') {
             steps {
                 container('dind') {
@@ -137,7 +120,6 @@ spec:
             }
         }
 
-        /* --------------------- DEPLOY TO K8s --------------------- */
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
