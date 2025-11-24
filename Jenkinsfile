@@ -47,10 +47,9 @@ spec:
     }
 
     environment {
-        // Nexus registry base (change if your nexus host differs)
-        NEXUS_REG := 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
-        NEXUS_REPO := "${env.NEXUS_REG}/mpanderepo"
-        IMAGE_NAME := "${env.NEXUS_REPO}/travelstory-frontend"
+        NEXUS_REG = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+        NEXUS_REPO = "${NEXUS_REG}/mpanderepo"
+        IMAGE_NAME = "${NEXUS_REPO}/travelstory-frontend"
     }
 
     stages {
@@ -71,7 +70,7 @@ spec:
                     sh '''
                         set -e
                         cd frontend
-                        echo "Using node: $(node -v)  npm: $(npm -v)"
+                        echo "Node: $(node -v), NPM: $(npm -v)"
                         npm ci --no-audit --no-fund
                         npm run build
                         ls -la dist || ls -la build || true
@@ -82,14 +81,12 @@ spec:
 
         stage('Docker Login (Nexus)') {
             steps {
-                // uses Jenkins credential of type "Username with password" with id 'nexus-creds'
-                withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                     container('dind') {
                         sh '''
                             set -e
-                            echo "Logging in to Nexus docker registry..."
+                            echo "Logging in to Nexus..."
                             docker login ${NEXUS_REG} -u "${NEXUS_USER}" -p "${NEXUS_PASS}"
-                            docker info | sed -n '1,120p'
                         '''
                     }
                 }
@@ -101,10 +98,9 @@ spec:
                 container('dind') {
                     sh '''
                         set -e
-                        echo "Building docker image from ./frontend"
                         TAG="${IMAGE_NAME}:${BUILD_NUMBER}"
+                        echo "Building Docker Image..."
                         docker build -t "${TAG}" ./frontend
-                        # also tag as latest (or pick your semantic tag)
                         docker tag "${TAG}" "${IMAGE_NAME}:latest"
                     '''
                 }
@@ -117,7 +113,7 @@ spec:
                     sh '''
                         set -e
                         TAG="${IMAGE_NAME}:${BUILD_NUMBER}"
-                        echo "Pushing ${TAG} and latest to Nexus..."
+                        echo "Pushing images to Nexus..."
                         docker push "${TAG}"
                         docker push "${IMAGE_NAME}:latest"
                     '''
@@ -131,11 +127,10 @@ spec:
                     sh '''
                         set -e
                         cd frontend
-                        # If you have a Sonar token stored in Jenkins, replace the actual token usage
                         sonar-scanner \
                             -Dsonar.projectKey=Travel-Story \
                             -Dsonar.sources=. \
-                            -Dsonar.host.url=http://sonarqube.imcc.com/ \
+                            -Dsonar.host.url=http://sonarqube.imcc.com \
                             -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41q
                     '''
                 }
@@ -147,8 +142,6 @@ spec:
                 container('kubectl') {
                     sh '''
                         set -e
-                        # Make sure your k8s deployment references the same image name & tag as pushed above
-                        # Example uses :latest - change if you prefer BUILD_NUMBER
                         kubectl set image deployment/travelstory-deployment travelstory-container=${IMAGE_NAME}:latest -n 2401149 || true
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
@@ -161,11 +154,11 @@ spec:
 
     post {
         always {
-            echo "Cleaning up workspace..."
+            echo "Cleaning workspace..."
             cleanWs()
         }
         success {
-            echo "Pipeline completed successfully."
+            echo "Pipeline completed successfully!"
         }
         failure {
             echo "Pipeline failed."
