@@ -1,25 +1,31 @@
 pipeline {
     agent {
         kubernetes {
-            yaml '''
+            label "travelstory-build-agent"
+            yaml """
 apiVersion: v1
 kind: Pod
 spec:
   containers:
-
   - name: node
     image: node:20
-    command: ['cat']
+    command: ["cat"]
     tty: true
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
 
   - name: sonar-scanner
     image: sonarsource/sonar-scanner-cli
-    command: ['cat']
+    command: ["cat"]
     tty: true
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    command: ['cat']
+    command: ["cat"]
     tty: true
     env:
     - name: KUBECONFIG
@@ -28,140 +34,134 @@ spec:
     - name: kubeconfig-secret
       mountPath: /kube/config
       subPath: kubeconfig
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
 
   - name: dind
     image: docker:dind
+    privileged: true
     args: ["--storage-driver=overlay2"]
-    securityContext:
-      privileged: true
-    env:
-    - name: DOCKER_TLS_CERTDIR
-      value: ""
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
+
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+    args: ["\${computer.jnlpmac}", "\${computer.name}"]
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
 
   volumes:
+  - name: workspace-volume
+    emptyDir: {}
   - name: kubeconfig-secret
     secret:
       secretName: kubeconfig-secret
-'''
+"""
         }
     }
 
     environment {
-        NEXUS_REG = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-        NEXUS_REPO = "${NEXUS_REG}/mpanderepo"
-        IMAGE_NAME = "${NEXUS_REPO}/travelstory-frontend"
+        REGISTRY_URL = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+        IMAGE_NAME = "travelstory-frontend"
+        SONAR_PROJECT_KEY = "TravelStory"
+        SONAR_HOST_URL = "http://sonarqube-service.sonarqube.svc.cluster.local:9000"
     }
 
     stages {
 
-        stage('Check Workspace Structure') {
+        stage("Check Workspace Structure") {
             steps {
-                sh '''
-                    echo "===== WORKSPACE CONTENTS ====="
-                    ls -la
-                    ls -R .
-                '''
+                sh """
+                echo ===== WORKSPACE CONTENTS =====
+                ls -la
+                """
             }
         }
 
-        stage('Install + Build Frontend') {
+        stage("Install + Build Frontend") {
             steps {
                 container('node') {
-                    sh '''
-                        set -e
-                        cd frontend
-                        echo "Node: $(node -v), NPM: $(npm -v)"
-                        npm ci --no-audit --no-fund
-                        npm run build
-                        ls -la dist || ls -la build || true
-                    '''
+                    sh """
+                    set -e
+                    cd frontend
+                    npm ci --no-audit --no-fund
+                    npm run build
+                    ls -la dist
+                    """
                 }
             }
         }
 
-        stage('Docker Login (Nexus)') {
+        stage("Docker Login (Nexus)") {
             steps {
-                withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
+                    usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]){
+
                     container('dind') {
-                        sh '''
-                            set -e
-                            echo "Logging in to Nexus..."
-                            docker login ${NEXUS_REG} -u "${NEXUS_USER}" -p "${NEXUS_PASS}"
-                        '''
+                        sh """
+                        echo Logging in to Nexus...
+                        docker login $REGISTRY_URL -u $NEXUS_USER -p $NEXUS_PASS
+                        """
                     }
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage("Build Docker Image") {
             steps {
                 container('dind') {
-                    sh '''
-                        set -e
-                        TAG="${IMAGE_NAME}:${BUILD_NUMBER}"
-                        echo "Building Docker Image..."
-                        docker build -t "${TAG}" ./frontend
-                        docker tag "${TAG}" "${IMAGE_NAME}:latest"
-                    '''
+                    sh """
+                    docker build -t $REGISTRY_URL/$IMAGE_NAME:v1 ./frontend
+                    """
                 }
             }
         }
 
-        stage('Push to Nexus') {
+        stage("Push to Nexus") {
             steps {
                 container('dind') {
-                    sh '''
-                        set -e
-                        TAG="${IMAGE_NAME}:${BUILD_NUMBER}"
-                        echo "Pushing images to Nexus..."
-                        docker push "${TAG}"
-                        docker push "${IMAGE_NAME}:latest"
-                    '''
+                    sh """
+                    docker push $REGISTRY_URL/$IMAGE_NAME:v1
+                    """
                 }
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage("SonarQube Analysis") {
             steps {
                 container('sonar-scanner') {
-                    sh '''
-                        set -e
-                        cd frontend
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh """
                         sonar-scanner \
-                            -Dsonar.projectKey=Travel-Story \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url=http://sonarqube.imcc.com \
-                            -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41q
-                    '''
+                          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=$SONAR_HOST_URL \
+                          -Dsonar.login=$SONAR_TOKEN
+                        """
+                    }
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage("Deploy to Kubernetes") {
             steps {
                 container('kubectl') {
-                    sh '''
-                        set -e
-                        kubectl set image deployment/travelstory-deployment travelstory-container=${IMAGE_NAME}:latest -n 2401149 || true
-                        kubectl apply -f k8s/deployment.yaml -n 2401149
-                        kubectl apply -f k8s/service.yaml -n 2401149
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149
-                    '''
+                    sh """
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                    kubectl rollout status deployment/travelstory-deployment -n 2401199
+                    """
                 }
             }
         }
+
     }
 
     post {
         always {
-            echo "Cleaning workspace..."
-            cleanWs()
-        }
-        success {
-            echo "Pipeline completed successfully!"
-        }
-        failure {
-            echo "Pipeline failed."
+            echo "Pipeline finished."
         }
     }
 }
