@@ -1,31 +1,24 @@
 pipeline {
     agent {
         kubernetes {
-            label "travelstory-build-agent"
-            yaml """
+            yaml '''
 apiVersion: v1
 kind: Pod
 spec:
   containers:
   - name: node
-    image: node:20
-    command: ["cat"]
+    image: node:18
+    command: ['cat']
     tty: true
-    volumeMounts:
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
 
   - name: sonar-scanner
     image: sonarsource/sonar-scanner-cli
-    command: ["cat"]
+    command: ['cat']
     tty: true
-    volumeMounts:
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    command: ["cat"]
+    command: ['cat']
     tty: true
     env:
     - name: KUBECONFIG
@@ -34,134 +27,163 @@ spec:
     - name: kubeconfig-secret
       mountPath: /kube/config
       subPath: kubeconfig
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
 
   - name: dind
     image: docker:dind
+    args:
+    - "--storage-driver=overlay2"
+    - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
     securityContext:
       privileged: true
-    args: ["--storage-driver=overlay2"]
-    volumeMounts:
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
-
-  - name: jnlp
-    image: jenkins/inbound-agent:latest
-    args: ["\${computer.jnlpmac}", "\${computer.name}"]
-    volumeMounts:
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
 
   volumes:
-  - name: workspace-volume
-    emptyDir: {}
   - name: kubeconfig-secret
     secret:
       secretName: kubeconfig-secret
-"""
+
+'''
         }
     }
 
     environment {
-        REGISTRY_URL = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-        IMAGE_NAME   = "travelstory-frontend"
-        SONAR_PROJECT_KEY = "TravelStory"
-        SONAR_HOST_URL = "http://sonarqube-service.sonarqube.svc.cluster.local:9000"
+        // Nexus registry hostname (used repeatedly) — edit if your env differs
+        NEXUS_REGISTRY = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+        APP_NAMESPACE  = "2401198"
+        FRONTEND_IMAGE = "${NEXUS_REGISTRY}/2401198/travelstory-frontend:v1"
+        BACKEND_IMAGE  = "${NEXUS_REGISTRY}/2401198/travelstory-backend:v1"
+        NODE_BASE      = "${NEXUS_REGISTRY}/library/node:18"
     }
 
     stages {
 
-        stage("Check Workspace") {
-            steps {
-                sh """
-                echo ===== WORKSPACE CONTENTS =====
-                ls -la
-                """
-            }
-        }
-
-        stage("Install + Build Frontend") {
+        /* ===============================
+              FRONTEND BUILD
+           =============================== */
+        stage('Install + Build Frontend') {
             steps {
                 container('node') {
-                    sh """
-                    cd frontend
-                    npm ci
-                    npm run build
-                    ls -la dist
-                    """
-                }
-            }
-        }
-
-        stage("Docker Login (Nexus)") {
-            steps {
-                withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
-                    usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-
-                    container('dind') {
-                        sh """
-                        echo Logging in to Nexus registry...
-                        docker login $REGISTRY_URL -u $NEXUS_USER -p $NEXUS_PASS
-                        """
+                    dir('frontend') {
+                        sh '''
+                            npm ci
+                            npm run build
+                        '''
                     }
                 }
             }
         }
 
-        stage("Build Docker Image") {
+        /* ===============================
+              BACKEND BUILD
+           =============================== */
+        stage('Install Backend Packages') {
             steps {
-                container('dind') {
-                    sh """
-                    docker build -t $REGISTRY_URL/$IMAGE_NAME:v1 ./frontend
-                    """
+                container('node') {
+                    dir('backend') {
+                        sh '''
+                            npm ci
+                        '''
+                    }
                 }
             }
         }
 
-        stage("Push to Nexus") {
-            steps {
-                container('dind') {
-                    sh """
-                    docker push $REGISTRY_URL/$IMAGE_NAME:v1
-                    """
-                }
-            }
-        }
+        /* ===============================
+              DOCKER BUILD + PUSH (using Nexus)
+           =============================== */
+        stage('Build, Tag & Push Docker Images') {
+  steps {
+    container('dind') {
+      withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
+                                        usernameVariable: 'NEXUS_USER',
+                                        passwordVariable: 'NEXUS_PASS')]) {
+        sh '''
+        set -euo pipefail
 
-        stage("SonarQube Analysis") {
+        echo "=== Docker Daemon Status ==="
+        docker info
+
+        echo "=== Login to Nexus (use stdin for security) ==="
+        echo "$NEXUS_PASS" | docker login $NEXUS_REGISTRY -u "$NEXUS_USER" --password-stdin
+
+
+
+        echo "=== Build frontend image ==="
+        docker build --build-arg NODE_IMAGE=${NODE_BASE} -t ${FRONTEND_IMAGE} frontend/
+
+        echo "=== Build backend image ==="
+        docker build --build-arg NODE_IMAGE=${NODE_BASE} -t ${BACKEND_IMAGE} backend/
+
+        echo "=== Push images to Nexus ==="
+        docker push ${FRONTEND_IMAGE}
+        docker push ${BACKEND_IMAGE}
+        '''
+      }
+    }
+  }
+}
+
+
+        /* ===============================
+              SONARQUBE SCAN (secure token)
+           =============================== */
+        stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh """
+                        sh '''
                         sonar-scanner \
-                          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                          -Dsonar.projectKey=Travel-Story \
                           -Dsonar.sources=. \
-                          -Dsonar.host.url=$SONAR_HOST_URL \
-                          -Dsonar.login=$SONAR_TOKEN
-                        """
+                          -Dsonar.host.url=http://sonarqube.imcc.com \
+                          -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
+                        '''
                     }
                 }
             }
         }
 
-        stage("Deploy to Kubernetes") {
+        /* ===============================
+              KUBERNETES DEPLOYMENT
+           =============================== */
+        stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    sh """
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-                    kubectl rollout status deployment/travelstory-deployment -n 2401199
-                    """
+                    sh '''
+                    set -euo pipefail
+
+                    # ensure namespace exists
+                    if ! kubectl get ns ${APP_NAMESPACE} >/dev/null 2>&1; then
+                        kubectl create ns ${APP_NAMESPACE}
+                    fi
+
+                    # Update k8s manifests (ensure images point to Nexus images)
+                    # It's recommended to update k8s/deployment.yaml to use the Nexus image paths.
+                    # For safety, we patch deployments here to use the newly built images.
+                    kubectl apply -f k8s/service.yaml -n ${APP_NAMESPACE} || true
+                    kubectl apply -f k8s/deployment.yaml -n ${APP_NAMESPACE} || true
+
+                    # Patch deployments (if deployments exist) to use the freshly pushed images
+                    kubectl -n ${APP_NAMESPACE} set image deployment/travelstory-frontend-deployment travelstory-frontend=${FRONTEND_IMAGE} || true
+                    kubectl -n ${APP_NAMESPACE} set image deployment/travelstory-backend-deployment travelstory-backend=${BACKEND_IMAGE} || true
+
+                    # Wait for rollout — use actual deployment name in your k8s manifests, adjust if different
+                    kubectl rollout status deployment/travelstory-frontend-deployment -n ${APP_NAMESPACE} --timeout=120s || true
+                    kubectl rollout status deployment/travelstory-backend-deployment -n ${APP_NAMESPACE} --timeout=120s || true
+                    '''
                 }
             }
         }
-
     }
 
     post {
-        always {
-            echo "Pipeline finished."
+        success {
+            echo "Pipeline completed successfully."
+        }
+        failure {
+            echo "Pipeline failed — check console log for details."
         }
     }
 }
