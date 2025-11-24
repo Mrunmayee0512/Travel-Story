@@ -39,7 +39,8 @@ spec:
 
   - name: dind
     image: docker:dind
-    privileged: true
+    securityContext:
+      privileged: true
     args: ["--storage-driver=overlay2"]
     volumeMounts:
     - name: workspace-volume
@@ -64,14 +65,14 @@ spec:
 
     environment {
         REGISTRY_URL = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-        IMAGE_NAME = "travelstory-frontend"
+        IMAGE_NAME   = "travelstory-frontend"
         SONAR_PROJECT_KEY = "TravelStory"
         SONAR_HOST_URL = "http://sonarqube-service.sonarqube.svc.cluster.local:9000"
     }
 
     stages {
 
-        stage("Check Workspace Structure") {
+        stage("Check Workspace") {
             steps {
                 sh """
                 echo ===== WORKSPACE CONTENTS =====
@@ -84,9 +85,8 @@ spec:
             steps {
                 container('node') {
                     sh """
-                    set -e
                     cd frontend
-                    npm ci --no-audit --no-fund
+                    npm ci
                     npm run build
                     ls -la dist
                     """
@@ -97,11 +97,11 @@ spec:
         stage("Docker Login (Nexus)") {
             steps {
                 withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
-                    usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]){
+                    usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
 
                     container('dind') {
                         sh """
-                        echo Logging in to Nexus...
+                        echo Logging in to Nexus registry...
                         docker login $REGISTRY_URL -u $NEXUS_USER -p $NEXUS_PASS
                         """
                     }
