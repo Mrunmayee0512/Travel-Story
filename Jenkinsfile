@@ -8,7 +8,7 @@ spec:
   containers:
 
   - name: node
-    image: node:18
+    image: node:20
     command: ['cat']
     tty: true
 
@@ -46,12 +46,20 @@ spec:
         }
     }
 
+    environment {
+        // Nexus registry base (change if your nexus host differs)
+        NEXUS_REG := 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
+        NEXUS_REPO := "${env.NEXUS_REG}/mpanderepo"
+        IMAGE_NAME := "${env.NEXUS_REPO}/travelstory-frontend"
+    }
+
     stages {
 
         stage('Check Workspace Structure') {
             steps {
                 sh '''
                     echo "===== WORKSPACE CONTENTS ====="
+                    ls -la
                     ls -R .
                 '''
             }
@@ -61,10 +69,29 @@ spec:
             steps {
                 container('node') {
                     sh '''
+                        set -e
                         cd frontend
-                        npm install
+                        echo "Using node: $(node -v)  npm: $(npm -v)"
+                        npm ci --no-audit --no-fund
                         npm run build
+                        ls -la dist || ls -la build || true
                     '''
+                }
+            }
+        }
+
+        stage('Docker Login (Nexus)') {
+            steps {
+                // uses Jenkins credential of type "Username with password" with id 'nexus-creds'
+                withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                    container('dind') {
+                        sh '''
+                            set -e
+                            echo "Logging in to Nexus docker registry..."
+                            docker login ${NEXUS_REG} -u "${NEXUS_USER}" -p "${NEXUS_PASS}"
+                            docker info | sed -n '1,120p'
+                        '''
+                    }
                 }
             }
         }
@@ -73,8 +100,26 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        sleep 10
-                        docker build -t travelstory-frontend:latest ./frontend
+                        set -e
+                        echo "Building docker image from ./frontend"
+                        TAG="${IMAGE_NAME}:${BUILD_NUMBER}"
+                        docker build -t "${TAG}" ./frontend
+                        # also tag as latest (or pick your semantic tag)
+                        docker tag "${TAG}" "${IMAGE_NAME}:latest"
+                    '''
+                }
+            }
+        }
+
+        stage('Push to Nexus') {
+            steps {
+                container('dind') {
+                    sh '''
+                        set -e
+                        TAG="${IMAGE_NAME}:${BUILD_NUMBER}"
+                        echo "Pushing ${TAG} and latest to Nexus..."
+                        docker push "${TAG}"
+                        docker push "${IMAGE_NAME}:latest"
                     '''
                 }
             }
@@ -84,7 +129,9 @@ spec:
             steps {
                 container('sonar-scanner') {
                     sh '''
+                        set -e
                         cd frontend
+                        # If you have a Sonar token stored in Jenkins, replace the actual token usage
                         sonar-scanner \
                             -Dsonar.projectKey=Travel-Story \
                             -Dsonar.sources=. \
@@ -95,42 +142,33 @@ spec:
             }
         }
 
-        stage('Login to Nexus Registry') {
-            steps {
-                container('dind') {
-                    sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                            -u admin -p Changeme@2025
-                    '''
-                }
-            }
-        }
-
-        stage('Push to Nexus') {
-            steps {
-                container('dind') {
-                    sh '''
-                        docker tag travelstory-frontend:latest \
-                            nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
-
-                        docker push \
-                            nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
-                    '''
-                }
-            }
-        }
-
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
                     sh '''
+                        set -e
+                        # Make sure your k8s deployment references the same image name & tag as pushed above
+                        # Example uses :latest - change if you prefer BUILD_NUMBER
+                        kubectl set image deployment/travelstory-deployment travelstory-container=${IMAGE_NAME}:latest -n 2401149 || true
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-
                         kubectl rollout status deployment/travelstory-deployment -n 2401149
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up workspace..."
+            cleanWs()
+        }
+        success {
+            echo "Pipeline completed successfully."
+        }
+        failure {
+            echo "Pipeline failed."
         }
     }
 }
