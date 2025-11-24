@@ -1,0 +1,6 @@
+projectKey=Travel-Story
+serverUrl=http://sonarqube.imcc.com
+serverVersion=25.1.0.102122
+dashboardUrl=http://sonarqube.imcc.com/dashboard?id=Travel-Story
+ceTaskId=046a5956-1fc6-4768-b8ef-1c52fe22aa92
+ceTaskUrl=http://sonarqube.imcc.com/api/ce/task?id=046a5956-1fc6-4768-b8ef-1c52fe22aa92
