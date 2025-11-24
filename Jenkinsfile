@@ -37,6 +37,7 @@ spec:
     env:
     - name: DOCKER_TLS_CERTDIR
       value: ""
+
   volumes:
   - name: kubeconfig-secret
     secret:
@@ -51,6 +52,7 @@ spec:
             steps {
                 container('node') {
                     sh '''
+                        cd travelstory-frontend
                         npm install
                         npm run build
                     '''
@@ -63,8 +65,9 @@ spec:
                 container('dind') {
                     sh '''
                         sleep 10
-                        docker build -t travelstory-frontend:latest .
-                        docker build -t travelstory-backend:latest .
+
+                        # Build frontend image from travelstory-frontend folder
+                        docker build -t travelstory-frontend:latest ./travelstory-frontend
                     '''
                 }
             }
@@ -74,36 +77,37 @@ spec:
             steps {
                 container('sonar-scanner') {
                     sh '''
+                        cd travelstory-frontend
                         sonar-scanner \
                             -Dsonar.projectKey=Travel-Story \
                             -Dsonar.sources=. \
-                            -Dsonar.host.url=http://sonarqube.imcc.com/\
+                            -Dsonar.host.url=http://sonarqube.imcc.com/ \
                             -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41q
                     '''
                 }
             }
         }
 
-
         stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
                     sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u admin -p Changeme@2025
+                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                            -u admin -p Changeme@2025
                     '''
                 }
             }
         }
 
-
         stage('Push to Nexus') {
             steps {
                 container('dind') {
                     sh '''
-                        docker tag travelstory-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
-                        docker tag travelstory-backend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-backend:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-backend:v1
+                        docker tag travelstory-frontend:latest \
+                            nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
+
+                        docker push \
+                            nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
                     '''
                 }
             }
@@ -115,7 +119,7 @@ spec:
                     sh '''
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-                        
+
                         kubectl rollout status deployment/travelstory-deployment -n 2401149
                     '''
                 }
