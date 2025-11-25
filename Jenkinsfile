@@ -1,80 +1,139 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
 
-    environment {
-        SONAR_HOST_URL = "http://sonarqube.imcc.com"
-        SONAR_TOKEN = "sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41"
+  - name: node
+    image: node:20
+    command: ['cat']
+    tty: true
 
-        NEXUS_REGISTRY = "nexus.imcc.com"
-        FRONTEND_IMAGE = "nexus.imcc.com/mpanderepo/travelstory-frontend:v1"
-        BACKEND_IMAGE  = "nexus.imcc.com/mpanderepo/travelstory-backend:v1"
+  - name: sonar-scanner
+    image: sonarsource/sonar-scanner-cli
+    command: ['cat']
+    tty: true
+
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ['cat']
+    tty: true
+    env:
+    - name: KUBECONFIG
+      value: /kube/config
+    volumeMounts:
+    - name: kubeconfig-secret
+      mountPath: /kube/config
+      subPath: kubeconfig
+
+  - name: dind
+    image: docker:dind
+    args: ["--storage-driver=overlay2"]
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+
+  volumes:
+  - name: kubeconfig-secret
+    secret:
+      secretName: kubeconfig-secret
+'''
+        }
     }
 
     stages {
 
-        stage('Checkout Code') {
+        stage('Install + Build Frontend') {
             steps {
-                git branch: 'main', url: 'https://github.com/Mrunmayee0512/Travel-Story.git'
+                container('node') {
+                    dir('frontend') {   // <-- frontend folder
+                        sh '''
+                            npm install
+                            npm run build
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Install Backend Dependencies') {
+    steps {
+        container('node') {
+            dir('backend') {
+                sh 'npm install'
+            }
+        }
+    }
+}
+
+
+        stage('Build Docker Images') {
+            steps {
+                container('dind') {
+                    sh '''
+                        sleep 10
+                        docker build -t travelstory-frontend:latest ./frontend
+                        docker build -t travelstory-backend:latest ./backend
+                    '''
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                sh """
-                    sonar-scanner \
-                        -Dsonar.projectKey=Travel-Story \
-                        -Dsonar.sources=. \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
-                        -Dsonar.login=$SONAR_TOKEN
-                """
+                container('sonar-scanner') {
+                    dir('backend') {  // analyzing backend code
+                        sh '''
+                            sonar-scanner \
+                                -Dsonar.projectKey=Travel-Story \
+                                -Dsonar.sources=. \
+                                -Dsonar.host.url=http://sonarqube.imcc.com/ \
+                                -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
+                        '''
+                    }
+                }
             }
         }
 
-        stage('Docker Build (Frontend & Backend)') {
+        stage('Login to Nexus Registry') {
             steps {
-                sh '''
-                    echo "=== Building FRONTEND image ==="
-                    docker build -t ${FRONTEND_IMAGE} frontend/
-
-                    echo "=== Building BACKEND image ==="
-                    docker build -t ${BACKEND_IMAGE} backend/
-                '''
+                container('dind') {
+                    sh '''
+                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u student -p Changeme@2025
+                    '''
+                }
             }
         }
 
-        stage('Docker Login & Push') {
+        stage('Push to Nexus') {
             steps {
-                sh '''
-                    echo "=== Docker Login ==="
-                    docker login $NEXUS_REGISTRY -u student -p Imcc@2025
+                container('dind') {
+                    sh '''
+                        docker tag travelstory-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
+                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
 
-                    echo "=== Pushing FRONTEND ==="
-                    docker push ${FRONTEND_IMAGE}
-
-                    echo "=== Pushing BACKEND ==="
-                    docker push ${BACKEND_IMAGE}
-                '''
+                        docker tag travelstory-backend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-backend:v1
+                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-backend:v1
+                    '''
+                }
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-
-                    kubectl rollout status deployment/travelstory-deployment -n 2401149
-                '''
+                container('kubectl') {
+                    sh '''
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149
+                    '''
+                }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Pipeline executed successfully!"
-        }
-        failure {
-            echo "Pipeline failed!"
         }
     }
 }
