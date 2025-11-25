@@ -51,7 +51,7 @@ spec:
         stage('Install + Build Frontend') {
             steps {
                 container('node') {
-                    dir('frontend') {   // <-- frontend folder
+                    dir('frontend') {
                         sh '''
                             npm install
                             npm run build
@@ -62,15 +62,14 @@ spec:
         }
 
         stage('Install Backend Dependencies') {
-    steps {
-        container('node') {
-            dir('backend') {
-                sh 'npm install'
+            steps {
+                container('node') {
+                    dir('backend') {
+                        sh 'npm install'
+                    }
+                }
             }
         }
-    }
-}
-
 
         stage('Build Docker Images') {
             steps {
@@ -87,7 +86,7 @@ spec:
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
-                    dir('backend') {  // analyzing backend code
+                    dir('backend') {
                         sh '''
                             sonar-scanner \
                                 -Dsonar.projectKey=Travel-Story \
@@ -104,7 +103,8 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u student -p Imcc@2025
+                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                            -u student -p Imcc@2025
                     '''
                 }
             }
