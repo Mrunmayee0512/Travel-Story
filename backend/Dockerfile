@@ -1,9 +1,16 @@
-FROM nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/node:20
+FROM node:20
 
 WORKDIR /app
+
+# Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm install --production
+
+# Copy source code
 COPY . .
 
+# Rebuild bcrypt for compatibility
+RUN npm rebuild bcrypt --build-from-source
+
 EXPOSE 5000
-CMD ["npm", "start"]
+CMD ["node", "index.js"]
