@@ -8,7 +8,7 @@ spec:
   containers:
 
   - name: node
-    image: node:20
+    image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/node:20
     command: ['cat']
     tty: true
 
@@ -77,9 +77,14 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        sleep 10
-                        docker build -t travelstory-frontend:latest ./frontend
-                        docker build -t travelstory-backend:latest ./backend
+                        # Pull base images from Nexus instead of Docker Hub
+                        docker pull nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/node:20
+                        docker pull nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/nginx:alpine
+
+                        sleep 5
+
+                        docker build --no-cache -t travelstory-frontend:latest ./frontend
+                        docker build --no-cache -t travelstory-backend:latest ./backend
                     '''
                 }
             }
