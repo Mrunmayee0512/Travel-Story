@@ -11,11 +11,17 @@ spec:
     image: node:20
     command: ['cat']
     tty: true
+    volumeMounts:
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
 
   - name: sonar-scanner
     image: sonarsource/sonar-scanner-cli
     command: ['cat']
     tty: true
+    volumeMounts:
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
 
   - name: kubectl
     image: bitnami/kubectl:latest
@@ -28,24 +34,45 @@ spec:
     - name: kubeconfig-secret
       mountPath: /kube/config
       subPath: kubeconfig
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
 
   - name: dind
     image: docker:dind
+    securityContext:
+      privileged: true
     args:
       - "--storage-driver=overlay2"
       - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-    securityContext:
-      privileged: true
     env:
     - name: DOCKER_TLS_CERTDIR
       value: ""
+    volumeMounts:
+    - mountPath: /home/jenkins/agent
+      name: workspace-volume
+
+  - name: jnlp
+    image: jenkins/inbound-agent:3309.v27b_9314fd1a_4-1
+    env:
+    - name: JENKINS_AGENT_WORKDIR
+      value: "/home/jenkins/agent"
+    volumeMounts:
+    - mountPath: "/home/jenkins/agent"
+      name: workspace-volume
 
   volumes:
+  - name: workspace-volume
+    emptyDir: {}
   - name: kubeconfig-secret
     secret:
       secretName: kubeconfig-secret
 '''
         }
+    }
+
+    environment {
+        REGISTRY = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+        REPO = "mpanderepo"
     }
 
     stages {
@@ -105,22 +132,38 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                            -u student -p Imcc@2025
+                        docker login ${REGISTRY} -u student -p Imcc@2025
                     '''
                 }
             }
         }
 
-        stage('Push to Nexus') {
+        stage('Tag + Push Images') {
             steps {
                 container('dind') {
                     sh '''
-                        docker tag travelstory-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-frontend:v1
+                        docker tag travelstory-frontend:latest ${REGISTRY}/${REPO}/travelstory-frontend:${BUILD_NUMBER}
+                        docker push ${REGISTRY}/${REPO}/travelstory-frontend:${BUILD_NUMBER}
 
-                        docker tag travelstory-backend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-backend:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/mpanderepo/travelstory-backend:v1
+                        docker tag travelstory-backend:latest ${REGISTRY}/${REPO}/travelstory-backend:${BUILD_NUMBER}
+                        docker push ${REGISTRY}/${REPO}/travelstory-backend:${BUILD_NUMBER}
+                    '''
+                }
+            }
+        }
+
+        stage('Create Namespace + Registry Secret') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        kubectl get namespace 2401149 || kubectl create namespace 2401149
+
+                        kubectl create secret docker-registry nexus-secret \
+                          --docker-server=${REGISTRY} \
+                          --docker-username=student \
+                          --docker-password=Imcc@2025 \
+                          --namespace=2401149 \
+                          --dry-run=client -o yaml | kubectl apply -f -
                     '''
                 }
             }
@@ -129,11 +172,17 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    sh '''
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149
-                    '''
+                    dir('k8s') {
+                        sh '''
+                            sed -i "s|travelstory-frontend:latest|travelstory-frontend:${BUILD_NUMBER}|g" deployment.yaml
+                            sed -i "s|travelstory-backend:latest|travelstory-backend:${BUILD_NUMBER}|g" deployment.yaml
+
+                            kubectl apply -f deployment.yaml
+                            kubectl apply -f service.yaml
+
+                            kubectl rollout status deployment/travelstory-deployment -n 2401149
+                        '''
+                    }
                 }
             }
         }
