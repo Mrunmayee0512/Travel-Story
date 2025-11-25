@@ -72,12 +72,11 @@ spec:
         FRONTEND_IMAGE = "${NEXUS_REGISTRY}/mpanderepo/travelstory-frontend:v1"
         BACKEND_IMAGE  = "${NEXUS_REGISTRY}/mpanderepo/travelstory-backend:v1"
 
-        NODE_BASE      = "node:20"   // Node version updated
+        NODE_BASE      = "node:20"
     }
 
     stages {
 
-        /* =========== FRONTEND BUILD =========== */
         stage('Install + Build Frontend') {
             steps {
                 container('node') {
@@ -91,7 +90,6 @@ spec:
             }
         }
 
-        /* =========== BACKEND BUILD =========== */
         stage('Install Backend Packages') {
             steps {
                 container('node') {
@@ -102,36 +100,39 @@ spec:
             }
         }
 
-        /* =========== DOCKER BUILD & PUSH =========== */
+        /* ========= DOCKER BUILD & PUSH FIXED ========= */
         stage('Build, Tag & Push Docker Images') {
             steps {
                 container('dind') {
-                    withCredentials([usernamePassword(credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
-                                                      usernameVariable: 'student',
-                                                      passwordVariable: 'Imcc@2025')]) {
+
+                    withCredentials([usernamePassword(
+                        credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
+                    )]) {
 
                         sh '''
-                        set -euo pipefail
+                            set -euo pipefail
 
-                        echo "=== Logging into Nexus Registry ==="
-                        echo "$NEXUS_PASS" | docker login $NEXUS_REGISTRY -u "$NEXUS_USER" --password-stdin
+                            echo "=== Logging into Nexus Registry ==="
+                            echo "$NEXUS_PASS" | docker login $NEXUS_REGISTRY -u "$NEXUS_USER" --password-stdin
 
-                        echo "=== Building Frontend Image ==="
-                        docker build -t ${FRONTEND_IMAGE} frontend/
+                            echo "=== Building Frontend Image ==="
+                            docker build -t ${FRONTEND_IMAGE} frontend/
 
-                        echo "=== Building Backend Image ==="
-                        docker build -t ${BACKEND_IMAGE} backend/
+                            echo "=== Building Backend Image ==="
+                            docker build -t ${BACKEND_IMAGE} backend/
 
-                        echo "=== Pushing Images to Nexus ==="
-                        docker push ${FRONTEND_IMAGE}
-                        docker push ${BACKEND_IMAGE}
+                            echo "=== Pushing Images ==="
+                            docker push ${FRONTEND_IMAGE}
+                            docker push ${BACKEND_IMAGE}
                         '''
                     }
                 }
             }
         }
 
-        /* =========== SONARQUBE SCAN =========== */
+        /* ========= SONAR FIXED (Removed Hardcoding) ========= */
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
@@ -141,14 +142,14 @@ spec:
                             -Dsonar.projectKey=Travel-Story \
                             -Dsonar.sources=. \
                             -Dsonar.host.url=http://sonarqube.imcc.com \
-                            -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
+                            -Dsonar.login=$SONAR_TOKEN
                         '''
                     }
                 }
             }
         }
 
-        /* =========== DEPLOY TO KUBERNETES =========== */
+        /* ========= DEPLOY ========= */
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
