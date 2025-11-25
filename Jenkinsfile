@@ -10,34 +10,48 @@ pipeline {
 
     stages {
 
+        /* ============================
+                CHECKOUT
+        ============================ */
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/Mrunmayee0512/Travel-Story.git'
             }
         }
 
+
+        /* ============================
+              SONARQUBE FIXED STAGE
+           (No sonar-scanner needed)
+        ============================ */
         stage("SonarQube Analysis") {
             steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    script {
-                        sh """
-                            sonar-scanner \
-                              -Dsonar.projectKey=travelstory \
-                              -Dsonar.sources=. \
-                              -Dsonar.host.url=http://sonarqube.imcc.com/ \
-                              -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
-                        """
-                    }
+                withSonarQubeEnv('sonarqube-server') {
+                    sh """
+                        sonar-scanner \
+                          -Dsonar.projectKey=Travel-Story \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=http://sonarqube.imcc.com/ \
+                          -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
+                    """
                 }
             }
         }
 
+
+        /* ============================
+               BUILD STAGE
+        ============================ */
         stage('Build Project') {
             steps {
                 sh "echo 'Building frontend project...'"
             }
         }
 
+
+        /* ============================
+           DOCKER BUILD & PUSH - FIXED
+        ============================ */
         stage('Docker Build & Push') {
             steps {
                 withCredentials([
@@ -52,34 +66,36 @@ pipeline {
                         echo "$NEXUS_PASS" | docker login $NEXUS_REGISTRY -u "$NEXUS_USER" --password-stdin
 
                         echo "=== Build Frontend Image ==="
-                        docker build --build-arg NODE_IMAGE=${NODE_BASE} -t ${FRONTEND_IMAGE} frontend/
+                        docker build -t ${FRONTEND_IMAGE} frontend/
 
                         echo "=== Build Backend Image ==="
-                        docker build --build-arg NODE_IMAGE=${NODE_BASE} -t ${BACKEND_IMAGE} backend/
+                        docker build -t ${BACKEND_IMAGE} backend/
 
-                        echo "=== Push Frontend Image ==="
+                        echo "=== Push Images ==="
                         docker push ${FRONTEND_IMAGE}
-
-                        echo "=== Push Backend Image ==="
                         docker push ${BACKEND_IMAGE}
                     '''
                 }
             }
         }
 
+
+        /* ============================
+                KUBERNETES DEPLOY
+        ============================ */
         stage('Deploy to Kubernetes') {
             steps {
-                script {
-                    withCredentials([
-                        kubeconfigFile(credentialsId: 'k8s-config')
-                    ]) {
-                        sh '''
-                            kubectl apply -f k8s/deployment.yaml
-                            kubectl apply -f k8s/service.yaml
+                withCredentials([
+                    kubeconfigFile(credentialsId: 'k8s-config')
+                ]) {
+                    sh '''
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
 
-                            kubectl rollout status deployment/travelstory-deployment -n 2401149
-                        '''
-                    }
+                        # Name must match your deployment.yaml
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149
+                    '''
                 }
             }
         }
