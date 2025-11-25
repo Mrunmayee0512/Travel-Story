@@ -2,111 +2,79 @@ pipeline {
     agent any
 
     environment {
+        SONAR_HOST_URL = "http://sonarqube.imcc.com"
+        SONAR_TOKEN = "sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41"
+
         NEXUS_REGISTRY = "nexus.imcc.com"
         FRONTEND_IMAGE = "nexus.imcc.com/mpanderepo/travelstory-frontend:v1"
         BACKEND_IMAGE  = "nexus.imcc.com/mpanderepo/travelstory-backend:v1"
-        NODE_BASE = "node:18-alpine"
     }
 
     stages {
 
-        /* ============================
-                CHECKOUT
-        ============================ */
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/Mrunmayee0512/Travel-Story.git'
             }
         }
 
-
-        /* ============================
-              SONARQUBE FIXED STAGE
-           (No sonar-scanner needed)
-        ============================ */
-        stage("SonarQube Analysis") {
+        stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube-server') {
-                    sh """
-                        sonar-scanner \
-                          -Dsonar.projectKey=Travel-Story \
-                          -Dsonar.sources=. \
-                          -Dsonar.host.url=http://sonarqube.imcc.com/ \
-                          -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
-                    """
-                }
+                sh """
+                    sonar-scanner \
+                        -Dsonar.projectKey=Travel-Story \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.login=$SONAR_TOKEN
+                """
             }
         }
 
-
-        /* ============================
-               BUILD STAGE
-        ============================ */
-        stage('Build Project') {
+        stage('Docker Build (Frontend & Backend)') {
             steps {
-                sh "echo 'Building frontend project...'"
+                sh '''
+                    echo "=== Building FRONTEND image ==="
+                    docker build -t ${FRONTEND_IMAGE} frontend/
+
+                    echo "=== Building BACKEND image ==="
+                    docker build -t ${BACKEND_IMAGE} backend/
+                '''
             }
         }
 
-
-        /* ============================
-           DOCKER BUILD & PUSH - FIXED
-        ============================ */
-        stage('Docker Build & Push') {
+        stage('Docker Login & Push') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
-                        usernameVariable: 'NEXUS_USER',
-                        passwordVariable: 'NEXUS_PASS'
-                    )
-                ]) {
-                    sh '''
-                        echo "=== Docker Login to Nexus ==="
-                        echo "$NEXUS_PASS" | docker login $NEXUS_REGISTRY -u "$NEXUS_USER" --password-stdin
+                sh '''
+                    echo "=== Docker Login ==="
+                    docker login $NEXUS_REGISTRY -u student -p Imcc@2025
 
-                        echo "=== Build Frontend Image ==="
-                        docker build -t ${FRONTEND_IMAGE} frontend/
+                    echo "=== Pushing FRONTEND ==="
+                    docker push ${FRONTEND_IMAGE}
 
-                        echo "=== Build Backend Image ==="
-                        docker build -t ${BACKEND_IMAGE} backend/
-
-                        echo "=== Push Images ==="
-                        docker push ${FRONTEND_IMAGE}
-                        docker push ${BACKEND_IMAGE}
-                    '''
-                }
+                    echo "=== Pushing BACKEND ==="
+                    docker push ${BACKEND_IMAGE}
+                '''
             }
         }
 
-
-        /* ============================
-                KUBERNETES DEPLOY
-        ============================ */
         stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([
-                    kubeconfigFile(credentialsId: 'k8s-config')
-                ]) {
-                    sh '''
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
+                sh '''
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
 
-                        # Name must match your deployment.yaml
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149
-                    '''
-                }
+                    kubectl rollout status deployment/travelstory-deployment -n 2401149
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline executed successfully!!"
+            echo "Pipeline executed successfully!"
         }
         failure {
-            echo "Pipeline failed. Check logs."
+            echo "Pipeline failed!"
         }
     }
 }
