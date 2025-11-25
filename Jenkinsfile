@@ -23,10 +23,11 @@ spec:
     tty: true
     env:
     - name: KUBECONFIG
-      value: /kube/kubeconfig
+      value: /kube/config
     volumeMounts:
     - name: kubeconfig-secret
-      mountPath: /kube
+      mountPath: /kube/config
+      subPath: kubeconfig
 
   - name: dind
     image: docker:dind
