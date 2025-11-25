@@ -57,8 +57,8 @@ pipeline {
                 withCredentials([
                     usernamePassword(
                         credentialsId: '719f20f1-cabe-4536-96c0-6c312656e8fe',
-                        usernameVariable: 'student',
-                        passwordVariable: 'Imcc@2025'
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
                     )
                 ]) {
                     sh '''
