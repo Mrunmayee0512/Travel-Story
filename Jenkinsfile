@@ -9,7 +9,7 @@ spec:
 
   - name: node
     image: node:20
-    command: ['cat']
+    command: ['sh', '-c', 'while true; do sleep 30; done']
     tty: true
     volumeMounts:
     - mountPath: /home/jenkins/agent
@@ -17,7 +17,7 @@ spec:
 
   - name: sonar-scanner
     image: sonarsource/sonar-scanner-cli
-    command: ['cat']
+    command: ['sh', '-c', 'while true; do sleep 30; done']
     tty: true
     volumeMounts:
     - mountPath: /home/jenkins/agent
@@ -25,15 +25,14 @@ spec:
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    command: ['cat']
+    command: ['sh', '-c', 'while true; do sleep 30; done']
     tty: true
     env:
     - name: KUBECONFIG
-      value: /kube/config
+      value: /kube/kubeconfig
     volumeMounts:
     - name: kubeconfig-secret
-      mountPath: /kube/config
-      subPath: kubeconfig
+      mountPath: /kube
     - mountPath: /home/jenkins/agent
       name: workspace-volume
 
@@ -41,6 +40,8 @@ spec:
     image: docker:dind
     securityContext:
       privileged: true
+    command: ['sh', '-c', 'while true; do sleep 30; done']
+    tty: true
     args:
       - "--storage-driver=overlay2"
       - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
@@ -165,7 +166,9 @@ spec:
                           --docker-username=student \
                           --docker-password=Imcc@2025 \
                           --namespace=2401149 \
-                          --dry-run=client -o yaml | kubectl apply -f -
+                          --dry-run=client -o yaml > secret.yaml
+
+                        kubectl apply -f secret.yaml
                     '''
                 }
             }
