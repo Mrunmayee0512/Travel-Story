@@ -156,8 +156,10 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
+                        # Create namespace if not exists
                         kubectl get namespace 2401149 || kubectl create namespace 2401149
 
+                        # Create/Update image pull secret
                         kubectl create secret docker-registry nexus-secret \
                           --docker-server=${REGISTRY} \
                           --docker-username=student \
