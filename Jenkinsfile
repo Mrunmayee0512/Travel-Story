@@ -105,7 +105,6 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        sleep 10
                         docker build -t travelstory-frontend:latest ./frontend
                         docker build -t travelstory-backend:latest ./backend
                     '''
@@ -121,7 +120,7 @@ spec:
                             sonar-scanner \
                                 -Dsonar.projectKey=Travel-Story \
                                 -Dsonar.sources=. \
-                                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.sonarqube.svc.cluster.local:9000 \
                                 -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
                         '''
                     }
@@ -157,10 +156,8 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        # Create namespace if not exists
                         kubectl get namespace 2401149 || kubectl create namespace 2401149
 
-                        # Create/Update image pull secret
                         kubectl create secret docker-registry nexus-secret \
                           --docker-server=${REGISTRY} \
                           --docker-username=student \
