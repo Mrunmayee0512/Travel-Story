@@ -6,41 +6,40 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
+    - name: node
+      image: node:20
+      command: ['cat']
+      tty: true
 
-  - name: node
-    image: node:20
-    command: ['cat']
-    tty: true
+    - name: sonar-scanner
+      image: sonarsource/sonar-scanner-cli
+      command: ['cat']
+      tty: true
 
-  - name: sonar-scanner
-    image: sonarsource/sonar-scanner-cli
-    command: ['cat']
-    tty: true
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: ['sh', '-c', 'sleep infinity']
+      tty: true
+      securityContext:
+        runAsUser: 0
+      env:
+        - name: KUBECONFIG
+          value: /kube/kubeconfig
+      volumeMounts:
+        - mountPath: /kube/kubeconfig
+          name: kubeconfig-secret
+          subPath: kubeconfig
 
-  - name: kubectl
-    image: bitnami/kubectl:latest
-    command: ['sh', '-c', 'sleep infinity']
-    tty: true
-    securityContext:
-      runAsUser: 0
-    env:
-      - name: KUBECONFIG
-        value: /kube/kubeconfig
-    volumeMounts:
-      - name: kubeconfig-secret
-        mountPath: /kube/kubeconfig
-        subPath: kubeconfig
-
-  - name: dind
-    image: docker:dind
-    args:
-      - "--storage-driver=overlay2"
-      - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-    securityContext:
-      privileged: true
-    env:
-      - name: DOCKER_TLS_CERTDIR
-        value: ""
+    - name: dind
+      image: docker:dind
+      args:
+        - "--storage-driver=overlay2"
+        - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+      securityContext:
+        privileged: true
+      env:
+        - name: DOCKER_TLS_CERTDIR
+          value: ""
 
   volumes:
     - name: kubeconfig-secret
@@ -52,27 +51,15 @@ spec:
 
     stages {
 
-        /* -------------------------
-           FRONTEND BUILD
-        -------------------------- */
-        stage('Install + Build Frontend') {
+        stage('Frontend Build') {
             steps {
                 container('node') {
                     dir('frontend') {
                         sh '''
-                            echo "Cleaning old npm cache..."
                             npm cache clean --force
-
-                            echo "Removing node_modules & lock file..."
                             rm -rf node_modules package-lock.json
-
-                            echo "Installing dependencies..."
                             npm install --legacy-peer-deps
-
-                            echo "Installing Vite globally..."
                             npm install -g vite
-
-                            echo "Running Vite build..."
                             npm run build
                         '''
                     }
@@ -80,24 +67,16 @@ spec:
             }
         }
 
-        /* -------------------------
-           BACKEND INSTALL
-        -------------------------- */
-        stage('Install Backend Dependencies') {
+        stage('Backend Install') {
             steps {
                 container('node') {
                     dir('backend') {
-                        sh '''
-                            npm install
-                        '''
+                        sh 'npm install'
                     }
                 }
             }
         }
 
-        /* -------------------------
-           BUILD DOCKER IMAGES
-        -------------------------- */
         stage('Build Docker Images') {
             steps {
                 container('dind') {
@@ -110,43 +89,34 @@ spec:
             }
         }
 
-        /* -------------------------
-           SONARQUBE ANALYSIS
-        -------------------------- */
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
                     dir('backend') {
                         sh '''
                             sonar-scanner \
-                                -Dsonar.projectKey=Travel-Story \
-                                -Dsonar.sources=. \
-                                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                                -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
+                              -Dsonar.projectKey=Travel-Story \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                              -Dsonar.login=sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41
                         '''
                     }
                 }
             }
         }
 
-        /* -------------------------
-           LOGIN TO NEXUS
-        -------------------------- */
-        stage('Login to Nexus Registry') {
+        stage('Login to Nexus') {
             steps {
                 container('dind') {
                     sh '''
                         docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                        -u admin -p Changeme@2025
+                          -u admin -p Changeme@2025
                     '''
                 }
             }
         }
 
-        /* -------------------------
-           PUSH IMAGES TO NEXUS
-        -------------------------- */
-        stage('Push to Nexus') {
+        stage('Push Docker Images') {
             steps {
                 container('dind') {
                     sh '''
@@ -160,28 +130,16 @@ spec:
             }
         }
 
-        /* -------------------------
-           KUBERNETES DEPLOYMENT
-        -------------------------- */
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
                     sh '''
-                        echo "Ensuring namespace exists..."
                         kubectl get ns 2401149 || kubectl create ns 2401149
-
-                        echo "Applying deployment and service..."
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-
-                        echo "Checking rollout status..."
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149 || true
-
-                        echo "Showing recent events..."
-                        kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20 || true
-
-                        echo "Current pods:"
-                        kubectl get pods -n 2401149 || true
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=120s || echo "Rollout may be delayed due to image pull"
+                        kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
+                        kubectl get pods -n 2401149
                     '''
                 }
             }

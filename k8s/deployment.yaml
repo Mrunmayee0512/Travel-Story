@@ -14,19 +14,14 @@ spec:
         app: travelstory
     spec:
       containers:
-
-        # -----------------------------
-        # FRONTEND CONTAINER
-        # -----------------------------
+        # FRONTEND
         - name: travelstory-frontend
           image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
           imagePullPolicy: Always
           ports:
             - containerPort: 80
 
-        # -----------------------------
-        # BACKEND CONTAINER
-        # -----------------------------
+        # BACKEND
         - name: travelstory-backend
           image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
           imagePullPolicy: Always
@@ -35,9 +30,11 @@ spec:
           env:
             - name: MONGO_URL
               value: "mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory"
-
             - name: JWT_SECRET
-              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2N2M4NTEyMTVjZjkzMGQ0MDg0NTE3ZDAiLCJpYXQiOjE3NDIyODY1MTgsImV4cCI6MTc0MjU0NTcxOH0.z5pHwue_KxvWGTPc4FbkS0gO9DKYdVoK3vHrqCBA87E"
-
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
             - name: SONAR_TOKEN
               value: "sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41"
+
+      # Pull images from Nexus with credentials
+      imagePullSecrets:
+        - name: nexus-credentials
