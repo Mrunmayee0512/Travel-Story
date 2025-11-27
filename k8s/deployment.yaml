@@ -14,13 +14,22 @@ spec:
         app: travelstory
     spec:
       containers:
+
+        # -----------------------------
+        # FRONTEND CONTAINER
+        # -----------------------------
         - name: travelstory-frontend
-          image: nexus.imcc.com:8082/2401149/travelstory-frontend:v1
+          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
 
+        # -----------------------------
+        # BACKEND CONTAINER
+        # -----------------------------
         - name: travelstory-backend
-          image: nexus.imcc.com:8082/2401149/travelstory-backend:v1
+          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:

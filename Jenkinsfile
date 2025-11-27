@@ -19,20 +19,16 @@ spec:
 
   - name: kubectl
     image: bitnami/kubectl:latest
-    command:
-      - /bin/sh
-      - -c
-      - sleep infinity
+    command: ['sh', '-c', 'sleep infinity']
     tty: true
     securityContext:
       runAsUser: 0
-      readOnlyRootFilesystem: false
     env:
       - name: KUBECONFIG
-        value: /kube/config
+        value: /kube/kubeconfig
     volumeMounts:
       - name: kubeconfig-secret
-        mountPath: /kube/config
+        mountPath: /kube/kubeconfig
         subPath: kubeconfig
 
   - name: dind
@@ -168,22 +164,27 @@ spec:
            KUBERNETES DEPLOYMENT
         -------------------------- */
         stage('Deploy to Kubernetes') {
-    steps {
-        container('kubectl') {
-            sh '''
-                echo "Ensuring namespace exists..."
-                kubectl get ns 2401149 || kubectl create ns 2401149
+            steps {
+                container('kubectl') {
+                    sh '''
+                        echo "Ensuring namespace exists..."
+                        kubectl get ns 2401149 || kubectl create ns 2401149
 
-                echo "Applying deployment and service..."
-                kubectl apply -f k8s/deployment.yaml -n 2401149
-                kubectl apply -f k8s/service.yaml -n 2401149
+                        echo "Applying deployment and service..."
+                        kubectl apply -f k8s/deployment.yaml -n 2401149
+                        kubectl apply -f k8s/service.yaml -n 2401149
 
-                echo "Checking rollout status..."
-                kubectl rollout status deployment/travelstory-deployment -n 2401149
-            '''
+                        echo "Checking rollout status..."
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149 || true
+
+                        echo "Showing recent events..."
+                        kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20 || true
+
+                        echo "Current pods:"
+                        kubectl get pods -n 2401149 || true
+                    '''
+                }
+            }
         }
-    }
-}
-
     }
 }
