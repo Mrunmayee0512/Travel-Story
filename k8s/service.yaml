@@ -1,20 +1,49 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: travelstory-service
   namespace: "2401149"
-
 spec:
   selector:
     app: travelstory
-
   ports:
     - name: frontend
+      protocol: TCP
       port: 80
       targetPort: 80
 
     - name: backend
+      protocol: TCP
       port: 5000
       targetPort: 5000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: travelstory-ingress
+  namespace: "2401149"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: travel.imcc.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: travelstory-service
+                port:
+                  number: 80
 
-  type: LoadBalancer
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: travelstory-service
+                port:
+                  number: 5000
