@@ -110,7 +110,7 @@ spec:
                 container('dind') {
                     sh '''
                         docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                          -u admin -p Changeme@2025
+                          -u student -p Imcc@2025
                     '''
                 }
             }
@@ -136,9 +136,9 @@ spec:
                     sh '''
                         kubectl create secret docker-registry nexus-credentials \
                           --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                          --docker-username=admin \
-                          --docker-password=Changeme@2025 \
-                          --docker-email=admin@example.com \
+                          --docker-username=student \
+                          --docker-password=Imcc@2025 \
+                          --docker-email=student@example.com \
                           -n 2401149 \
                           --dry-run=client -o yaml | kubectl apply -f -
                     '''
