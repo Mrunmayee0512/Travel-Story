@@ -34,7 +34,7 @@ spec:
       image: docker:dind
       args:
         - "--storage-driver=overlay2"
-        - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+        - "--insecure-registry=127.0.0.1:30085"
       securityContext:
         privileged: true
       env:
@@ -105,11 +105,11 @@ spec:
             }
         }
 
-        stage('Login to Nexus') {
+        stage('Login to Nexus (Local Registry)') {
             steps {
                 container('dind') {
                     sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                        docker login 127.0.0.1:30085 \
                         -u student -p Imcc@2025
                     '''
                 }
@@ -120,29 +120,29 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        docker tag travelstory-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
+                        docker tag travelstory-frontend:latest 127.0.0.1:30085/2401149/travelstory-frontend:v1
+                        docker push 127.0.0.1:30085/2401149/travelstory-frontend:v1
 
-                        docker tag travelstory-backend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
+                        docker tag travelstory-backend:latest 127.0.0.1:30085/2401149/travelstory-backend:v1
+                        docker push 127.0.0.1:30085/2401149/travelstory-backend:v1
                     '''
                 }
             }
         }
 
-        stage('Create Image Pull Secret & App Secret') {
+        stage('Create Secrets') {
             steps {
                 container('kubectl') {
                     sh '''
-                        # Create image pull secret if it doesn't exist
+                        kubectl create ns 2401149 --dry-run=client -o yaml | kubectl apply -f -
+
                         kubectl create secret docker-registry nexus-credentials \
-                        --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                        --docker-server=127.0.0.1:30085 \
                         --docker-username=student \
                         --docker-password=Imcc@2025 \
                         --docker-email=student@example.com \
                         -n 2401149 --dry-run=client -o yaml | kubectl apply -f -
 
-                        # Create app secret if it doesn't exist
                         kubectl create secret generic travelstory-secret \
                           -n 2401149 \
                           --from-literal=mongo_url="mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory" \
@@ -157,11 +157,21 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        kubectl get ns 2401149 || kubectl create ns 2401149
                         kubectl apply -f k8s/deployment.yaml -n 2401149
-                        kubectl apply -f k8s/service.yaml -n 2401149
+                        kubectl apply -f k8s/service-ingress.yaml -n 2401149
+
                         kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s || echo "Rollout may be delayed"
+
+                        echo "Pods:"
                         kubectl get pods -n 2401149
+
+                        echo "Services:"
+                        kubectl get svc -n 2401149
+
+                        echo "Ingress:"
+                        kubectl get ingress -n 2401149
+
+                        echo "Recent Events:"
                         kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
                     '''
                 }

@@ -17,6 +17,8 @@ spec:
         - name: nexus-credentials
 
       containers:
+
+        # FRONTEND CONTAINER
         - name: travelstory-frontend
           image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
           imagePullPolicy: Always
@@ -35,6 +37,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
 
+        # BACKEND CONTAINER
         - name: travelstory-backend
           image: 127.0.0.1:30085/2401149/travelstory-backend:v1
           imagePullPolicy: Always
@@ -46,17 +49,20 @@ spec:
                 secretKeyRef:
                   name: travelstory-secret
                   key: mongo_url
+
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: travelstory-secret
                   key: jwt_secret
+
           readinessProbe:
             httpGet:
               path: /health
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 5
+
           livenessProbe:
             httpGet:
               path: /health

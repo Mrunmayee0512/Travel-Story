@@ -19,20 +19,22 @@ spec:
       targetPort: 5000
   type: ClusterIP
 ---
+
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: travelstory-ingress
   namespace: "2401149"
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
   ingressClassName: nginx
   rules:
     - host: travel.imcc.com
       http:
         paths:
-          - path: /
+          # Frontend (Vite build output)
+          - path: /(.*)
             pathType: Prefix
             backend:
               service:
@@ -40,7 +42,8 @@ spec:
                 port:
                   number: 80
 
-          - path: /api
+          # Backend API
+          - path: /api/?(.*)
             pathType: Prefix
             backend:
               service:
