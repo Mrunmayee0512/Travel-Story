@@ -3,17 +3,24 @@ kind: Deployment
 metadata:
   name: travelstory-deployment
   namespace: "2401149"
+
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: travelstory
+
   template:
     metadata:
       labels:
         app: travelstory
+
     spec:
+      imagePullSecrets:
+        - name: nexus-credentials
+
       containers:
+
         # FRONTEND
         - name: travelstory-frontend
           image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
@@ -29,12 +36,13 @@ spec:
             - containerPort: 5000
           env:
             - name: MONGO_URL
-              value: "mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory"
-            - name: JWT_SECRET
-              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            - name: SONAR_TOKEN
-              value: "sqp_e560b77af3bf5fad79d2f9fb6e0ee105eff2bc41"
+              valueFrom:
+                secretKeyRef:
+                  name: travelstory-secret
+                  key: mongo_url
 
-      # Pull images from Nexus with credentials
-      imagePullSecrets:
-        - name: nexus-credentials
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: travelstory-secret
+                  key: jwt_secret

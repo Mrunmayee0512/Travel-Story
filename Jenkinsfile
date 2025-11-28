@@ -130,6 +130,36 @@ spec:
             }
         }
 
+        stage('Create Image Pull Secret') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        kubectl create secret docker-registry nexus-credentials \
+                          --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                          --docker-username=admin \
+                          --docker-password=Changeme@2025 \
+                          --docker-email=admin@example.com \
+                          -n 2401149 \
+                          --dry-run=client -o yaml | kubectl apply -f -
+                    '''
+                }
+            }
+        }
+
+        stage('Create App Secrets') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        kubectl create secret generic travelstory-secret \
+                          -n 2401149 \
+                          --from-literal=mongo_url="mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory" \
+                          --from-literal=jwt_secret="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+                          --dry-run=client -o yaml | kubectl apply -f -
+                    '''
+                }
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
@@ -137,7 +167,7 @@ spec:
                         kubectl get ns 2401149 || kubectl create ns 2401149
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=120s || echo "Rollout may be delayed due to image pull"
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=120s || echo "Rollout may be delayed"
                         kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
                         kubectl get pods -n 2401149
                     '''
