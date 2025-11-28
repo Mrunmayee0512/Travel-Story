@@ -34,7 +34,7 @@ spec:
       image: docker:dind
       args:
         - "--storage-driver=overlay2"
-        - "--insecure-registry=127.0.0.1:30085"
+        - "--insecure-registry=10.0.0.50:30085"
       securityContext:
         privileged: true
       env:
@@ -105,12 +105,11 @@ spec:
             }
         }
 
-        stage('Login to Nexus (Local Registry)') {
+        stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
                     sh '''
-                        docker login 127.0.0.1:30085 \
-                        -u student -p Imcc@2025
+                        docker login 10.0.0.50:30085 -u student -p Imcc@2025
                     '''
                 }
             }
@@ -120,11 +119,11 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        docker tag travelstory-frontend:latest 127.0.0.1:30085/2401149/travelstory-frontend:v1
-                        docker push 127.0.0.1:30085/2401149/travelstory-frontend:v1
+                        docker tag travelstory-frontend:latest 10.0.0.50:30085/2401149/travelstory-frontend:v1
+                        docker push 10.0.0.50:30085/2401149/travelstory-frontend:v1
 
-                        docker tag travelstory-backend:latest 127.0.0.1:30085/2401149/travelstory-backend:v1
-                        docker push 127.0.0.1:30085/2401149/travelstory-backend:v1
+                        docker tag travelstory-backend:latest 10.0.0.50:30085/2401149/travelstory-backend:v1
+                        docker push 10.0.0.50:30085/2401149/travelstory-backend:v1
                     '''
                 }
             }
@@ -137,7 +136,7 @@ spec:
                         kubectl create ns 2401149 --dry-run=client -o yaml | kubectl apply -f -
 
                         kubectl create secret docker-registry nexus-credentials \
-                        --docker-server=127.0.0.1:30085 \
+                        --docker-server=10.0.0.50:30085 \
                         --docker-username=student \
                         --docker-password=Imcc@2025 \
                         --docker-email=student@example.com \
@@ -162,17 +161,9 @@ spec:
 
                         kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s || echo "Rollout may be delayed"
 
-                        echo "Pods:"
                         kubectl get pods -n 2401149
-
-                        echo "Services:"
                         kubectl get svc -n 2401149
-
-                        echo "Ingress:"
                         kubectl get ingress -n 2401149
-
-                        echo "Recent Events:"
-                        kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
                     '''
                 }
             }
