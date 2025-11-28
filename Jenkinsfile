@@ -110,7 +110,7 @@ spec:
                 container('dind') {
                     sh '''
                         docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                          -u student -p Imcc@2025
+                        -u student -p Imcc@2025
                     '''
                 }
             }
@@ -130,26 +130,19 @@ spec:
             }
         }
 
-        stage('Create Image Pull Secret') {
+        stage('Create Image Pull Secret & App Secret') {
             steps {
                 container('kubectl') {
                     sh '''
+                        # Create image pull secret if it doesn't exist
                         kubectl create secret docker-registry nexus-credentials \
-                          --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                          --docker-username=student \
-                          --docker-password=Imcc@2025 \
-                          --docker-email=student@example.com \
-                          -n 2401149 \
-                          --dry-run=client -o yaml | kubectl apply -f -
-                    '''
-                }
-            }
-        }
+                        --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                        --docker-username=student \
+                        --docker-password=Imcc@2025 \
+                        --docker-email=student@example.com \
+                        -n 2401149 --dry-run=client -o yaml | kubectl apply -f -
 
-        stage('Create App Secrets') {
-            steps {
-                container('kubectl') {
-                    sh '''
+                        # Create app secret if it doesn't exist
                         kubectl create secret generic travelstory-secret \
                           -n 2401149 \
                           --from-literal=mongo_url="mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory" \
@@ -167,9 +160,9 @@ spec:
                         kubectl get ns 2401149 || kubectl create ns 2401149
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=120s || echo "Rollout may be delayed"
-                        kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
+                        kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s || echo "Rollout may be delayed"
                         kubectl get pods -n 2401149
+                        kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
                     '''
                 }
             }

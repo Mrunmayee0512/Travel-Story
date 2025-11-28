@@ -3,29 +3,37 @@ kind: Deployment
 metadata:
   name: travelstory-deployment
   namespace: "2401149"
-
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: travelstory
-
   template:
     metadata:
       labels:
         app: travelstory
-
     spec:
       imagePullSecrets:
         - name: nexus-credentials
 
       containers:
-
         - name: travelstory-frontend
           image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
           imagePullPolicy: Always
           ports:
             - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
 
         - name: travelstory-backend
           image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
@@ -38,9 +46,20 @@ spec:
                 secretKeyRef:
                   name: travelstory-secret
                   key: mongo_url
-
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: travelstory-secret
                   key: jwt_secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 10
