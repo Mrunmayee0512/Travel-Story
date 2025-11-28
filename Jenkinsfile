@@ -134,15 +134,15 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        # Create image pull secret if it doesn't exist
+                        # Create image pull secret
                         kubectl create secret docker-registry nexus-credentials \
-                        --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                        --docker-username=student \
-                        --docker-password=Imcc@2025 \
-                        --docker-email=student@example.com \
-                        -n 2401149 --dry-run=client -o yaml | kubectl apply -f -
+                          --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                          --docker-username=student \
+                          --docker-password=Imcc@2025 \
+                          --docker-email=student@example.com \
+                          -n 2401149 --dry-run=client -o yaml | kubectl apply -f -
 
-                        # Create app secret if it doesn't exist
+                        # Create app secret
                         kubectl create secret generic travelstory-secret \
                           -n 2401149 \
                           --from-literal=mongo_url="mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory" \
@@ -158,9 +158,19 @@ spec:
                 container('kubectl') {
                     sh '''
                         kubectl get ns 2401149 || kubectl create ns 2401149
+
+                        # Apply deployment and service
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-                        kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s || echo "Rollout may be delayed"
+
+                        # Wait for rollout
+                        if ! kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s; then
+                            echo "Rollout failed, performing rollback"
+                            kubectl rollout undo deployment/travelstory-deployment -n 2401149
+                            exit 1
+                        fi
+
+                        # Show pod status
                         kubectl get pods -n 2401149
                         kubectl get events -n 2401149 --sort-by=.metadata.creationTimestamp | tail -20
                     '''

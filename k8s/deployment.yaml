@@ -13,53 +13,37 @@ spec:
       labels:
         app: travelstory
     spec:
-      imagePullSecrets:
-        - name: nexus-credentials
-
       containers:
         - name: travelstory-frontend
           image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
-          imagePullPolicy: Always
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           readinessProbe:
             httpGet:
               path: /health
-              port: 80
+              port: 8080
             initialDelaySeconds: 5
-            periodSeconds: 5
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
-              port: 80
-            initialDelaySeconds: 30
-            periodSeconds: 10
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
 
         - name: travelstory-backend
           image: 127.0.0.1:30085/2401149/travelstory-backend:v1
-          imagePullPolicy: Always
           ports:
-            - containerPort: 5000
-          env:
-            - name: MONGO_URL
-              valueFrom:
-                secretKeyRef:
-                  name: travelstory-secret
-                  key: mongo_url
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: travelstory-secret
-                  key: jwt_secret
+            - containerPort: 8081
           readinessProbe:
             httpGet:
               path: /health
-              port: 5000
+              port: 8081
             initialDelaySeconds: 5
-            periodSeconds: 5
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
-              port: 5000
-            initialDelaySeconds: 30
-            periodSeconds: 10
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 20
