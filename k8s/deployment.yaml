@@ -18,7 +18,7 @@ spec:
 
       containers:
         - name: travelstory-frontend
-          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
+          image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -36,7 +36,7 @@ spec:
             periodSeconds: 10
 
         - name: travelstory-backend
-          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
+          image: 127.0.0.1:30085/2401149/travelstory-backend:v1
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
