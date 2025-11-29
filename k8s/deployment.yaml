@@ -1,3 +1,70 @@
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: travelstory-deployment
+#   namespace: "2401149"
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: travelstory
+#   strategy:
+#     type: RollingUpdate
+#     rollingUpdate:
+#       maxUnavailable: 0   # ensures new pod comes up before old pod terminates
+#       maxSurge: 1
+#   template:
+#     metadata:
+#       labels:
+#         app: travelstory
+#     spec:
+#       imagePullSecrets:
+#         - name: nexus-credentials
+#       containers:
+#         - name: travelstory-frontend
+#           image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
+#           ports:
+#             - containerPort: 80
+#           readinessProbe:
+#             httpGet:
+#               path: /
+#               port: 80
+#             initialDelaySeconds: 5
+#             periodSeconds: 10
+#           livenessProbe:
+#             httpGet:
+#               path: /
+#               port: 80
+#             initialDelaySeconds: 10
+#             periodSeconds: 20
+
+#         - name: travelstory-backend
+#           image: 127.0.0.1:30085/2401149/travelstory-backend:v1
+#           ports:
+#             - containerPort: 3000
+#           env:
+#             - name: MONGO_URI
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: travelstory-secret
+#                   key: mongo_url
+#             - name: JWT_SECRET
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: travelstory-secret
+#                   key: jwt_secret
+#           readinessProbe:
+#             httpGet:
+#               path: /health
+#               port: 3000
+#             initialDelaySeconds: 15  # wait for MongoDB
+#             periodSeconds: 10
+#           livenessProbe:
+#             httpGet:
+#               path: /health
+#               port: 3000
+#             initialDelaySeconds: 20
+#             periodSeconds: 20
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,7 +78,7 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0   # ensures new pod comes up before old pod terminates
+      maxUnavailable: 0   # ensures new pod starts before old one terminates
       maxSurge: 1
   template:
     metadata:
@@ -22,7 +89,7 @@ spec:
         - name: nexus-credentials
       containers:
         - name: travelstory-frontend
-          image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
+          image: 192.168.19.250:8085/2401149/travelstory-frontend:v1
           ports:
             - containerPort: 80
           readinessProbe:
@@ -39,7 +106,7 @@ spec:
             periodSeconds: 20
 
         - name: travelstory-backend
-          image: 127.0.0.1:30085/2401149/travelstory-backend:v1
+          image: 192.168.19.250:8085/2401149/travelstory-backend:v1
           ports:
             - containerPort: 3000
           env:
@@ -57,7 +124,7 @@ spec:
             httpGet:
               path: /health
               port: 3000
-            initialDelaySeconds: 15  # wait for MongoDB
+            initialDelaySeconds: 15   # wait for MongoDB connection
             periodSeconds: 10
           livenessProbe:
             httpGet:
