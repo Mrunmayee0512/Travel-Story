@@ -51,7 +51,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: travelstory-deployment
-  namespace: 2401149
+  namespace: "2401149"
 spec:
   replicas: 1
   selector:
