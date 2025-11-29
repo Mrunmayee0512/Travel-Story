@@ -226,7 +226,7 @@ spec:
       image: docker:dind
       args:
         - "--storage-driver=overlay2"
-        - "--insecure-registry=192.168.19.250:8085"
+        - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
       securityContext:
         privileged: true
       env:
@@ -308,7 +308,7 @@ spec:
                 container('dind') {
                     sh '''
                         set -e
-                        docker login 192.168.19.250:8085 -u student -p Imcc@2025
+                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u student -p Imcc@2025
                     '''
                 }
             }
@@ -319,11 +319,11 @@ spec:
                 container('dind') {
                     sh '''
                         set -e
-                        docker tag travelstory-frontend:latest 192.168.19.250:8085/2401149/travelstory-frontend:v1
-                        docker push 192.168.19.250:8085/2401149/travelstory-frontend:v1
+                        docker tag travelstory-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
+                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
 
-                        docker tag travelstory-backend:latest 192.168.19.250:8085/2401149/travelstory-backend:v1
-                        docker push 192.168.19.250:8085/2401149/travelstory-backend:v1
+                        docker tag travelstory-backend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
+                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
                     '''
                 }
             }
@@ -337,7 +337,7 @@ spec:
 
                         echo "Creating docker-registry secret..."
                         kubectl create secret docker-registry nexus-credentials \
-                          --docker-server=192.168.19.250:8085 \
+                          --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
                           --docker-username=student \
                           --docker-password=Imcc@2025 \
                           --docker-email=student@example.com \
