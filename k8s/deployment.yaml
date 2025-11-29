@@ -90,7 +90,7 @@ spec:
       containers:
         # ---------------- FRONTEND ----------------
         - name: travelstory-frontend
-          image: 127.0.0.1:30025/2401149/travelstory-frontend:v1
+          image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
           ports:
             - containerPort: 80
           readinessProbe:
@@ -108,7 +108,7 @@ spec:
 
         # ---------------- BACKEND ----------------
         - name: travelstory-backend
-          image: 127.0.0.1:30025/2401149/travelstory-backend:v1
+          image: 127.0.0.1:30085/2401149/travelstory-backend:v1
           ports:
             - containerPort: 3000
           env:
