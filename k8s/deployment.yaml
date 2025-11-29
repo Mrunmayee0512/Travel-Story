@@ -64,49 +64,24 @@ spec:
     spec:
       imagePullSecrets:
         - name: nexus-credentials
-      containers:
 
+      containers:
         - name: travelstory-frontend
-          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
+          image: 127.0.0.1:8083/2401149/travelstory-frontend:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
+
           readinessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: 5
+
           livenessProbe:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 20
-            periodSeconds: 20
-
-        - name: travelstory-backend
-          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
-          env:
-            - name: MONGO_URL
-              valueFrom:
-                secretKeyRef:
-                  name: travelstory-secret
-                  key: mongo_url
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: travelstory-secret
-                  key: jwt_secret
-          ports:
-            - containerPort: 8081
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8081
-            initialDelaySeconds: 8
+            initialDelaySeconds: 15
             periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 20

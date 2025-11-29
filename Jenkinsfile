@@ -187,22 +187,16 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
+
     - name: node
       image: node:20
-      command: ['cat']
-      tty: true
-
-    - name: sonar-scanner
-      image: sonarsource/sonar-scanner-cli
-      command: ['cat']
+      command: ["cat"]
       tty: true
 
     - name: kubectl
       image: bitnami/kubectl:latest
-      command: ['sh', '-c', 'sleep infinity']
+      command: ["sleep", "infinity"]
       tty: true
-      securityContext:
-        runAsUser: 0
       env:
         - name: KUBECONFIG
           value: /kube/kubeconfig
@@ -261,7 +255,7 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        sleep 10
+                        sleep 5
                         docker build -t travelstory-frontend:latest ./frontend
                         docker build -t travelstory-backend:latest ./backend
                     '''
@@ -274,7 +268,7 @@ spec:
                 container('dind') {
                     sh '''
                         docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                        -u student -p Imcc@2025
+                            -u student -p Imcc@2025
                     '''
                 }
             }
@@ -322,8 +316,10 @@ spec:
                         kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
 
+                        echo "Waiting for rollout..."
                         kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s
 
+                        echo "Pod status:"
                         kubectl get pods -n 2401149
                     '''
                 }
