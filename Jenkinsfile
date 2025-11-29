@@ -335,7 +335,7 @@ spec:
                     sh '''
                         set -e
 
-                        echo "Creating docker-registry secret..."
+                        # Docker registry secret
                         kubectl create secret docker-registry nexus-credentials \
                           --docker-server=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
                           --docker-username=student \
@@ -343,7 +343,7 @@ spec:
                           --docker-email=student@example.com \
                           -n 2401149 --dry-run=client -o yaml | kubectl apply -f -
 
-                        echo "Creating application secret..."
+                        # Application secrets
                         kubectl create secret generic travelstory-secret \
                           -n 2401149 \
                           --from-literal=mongo_url="mongodb+srv://pandemrunmayee0512:MPande0512@travelstory.5hwfd.mongodb.net/?retryWrites=true&w=majority&appName=travelstory" \
@@ -362,13 +362,24 @@ spec:
 
                         kubectl get ns 2401149 || kubectl create ns 2401149
 
-                        kubectl apply -f k8s/deployment.yaml -n 2401149
+                        # Apply deployments and services
+                        kubectl apply -f k8s/deployment-frontend.yaml -n 2401149
+                        kubectl apply -f k8s/deployment-backend.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
+                        kubectl apply -f k8s/ingress.yaml -n 2401149
 
-                        echo "Waiting for rollout..."
-                        if ! kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s; then
-                            echo "Rollout failed. Rolling back..."
-                            kubectl rollout undo deployment/travelstory-deployment -n 2401149
+                        echo "Waiting for frontend rollout..."
+                        if ! kubectl rollout status deployment/travelstory-frontend-deployment -n 2401149 --timeout=300s; then
+                            echo "Frontend rollout failed. Rolling back..."
+                            kubectl rollout undo deployment/travelstory-frontend-deployment -n 2401149
+                            kubectl get pods -n 2401149
+                            exit 1
+                        fi
+
+                        echo "Waiting for backend rollout..."
+                        if ! kubectl rollout status deployment/travelstory-backend-deployment -n 2401149 --timeout=300s; then
+                            echo "Backend rollout failed. Rolling back..."
+                            kubectl rollout undo deployment/travelstory-backend-deployment -n 2401149
                             kubectl get pods -n 2401149
                             exit 1
                         fi

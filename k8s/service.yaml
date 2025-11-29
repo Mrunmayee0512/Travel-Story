@@ -52,38 +52,45 @@
 #                 port:
 #                   number: 80
 # Frontend Service
+# ============================
+# FRONTEND SERVICE
+# ============================
 apiVersion: v1
 kind: Service
 metadata:
   name: travelstory-frontend-service
   namespace: "2401149"
 spec:
-  selector:
-    app: travelstory
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
   type: ClusterIP
+  selector:
+    app: travelstory-frontend
+  ports:
+    - port: 80
+      targetPort: 80
 
 ---
-# Backend Service (internal)
+
+# ============================
+# BACKEND SERVICE
+# ============================
 apiVersion: v1
 kind: Service
 metadata:
   name: travelstory-backend-service
   namespace: "2401149"
 spec:
-  selector:
-    app: travelstory
-  ports:
-    - protocol: TCP
-      port: 3000
-      targetPort: 3000
   type: ClusterIP
+  selector:
+    app: travelstory-backend
+  ports:
+    - port: 3000
+      targetPort: 3000
 
 ---
-# Frontend Ingress
+
+# ============================
+# INGRESS (Frontend + Backend)
+# ============================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -97,6 +104,7 @@ spec:
     - host: travel.imcc.com
       http:
         paths:
+          # ---------- FRONTEND ----------
           - path: /
             pathType: Prefix
             backend:
@@ -104,3 +112,12 @@ spec:
                 name: travelstory-frontend-service
                 port:
                   number: 80
+
+          # ---------- BACKEND ----------
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: travelstory-backend-service
+                port:
+                  number: 3000

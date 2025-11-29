@@ -88,6 +88,7 @@ spec:
       imagePullSecrets:
         - name: nexus-credentials
       containers:
+        # ---------------- FRONTEND ----------------
         - name: travelstory-frontend
           image: 192.168.19.250:8085/2401149/travelstory-frontend:v1
           ports:
@@ -104,7 +105,12 @@ spec:
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 20
+          # add label for service selector
+          env:
+            - name: APP_LABEL
+              value: travelstory-frontend
 
+        # ---------------- BACKEND ----------------
         - name: travelstory-backend
           image: 192.168.19.250:8085/2401149/travelstory-backend:v1
           ports:
@@ -120,6 +126,8 @@ spec:
                 secretKeyRef:
                   name: travelstory-secret
                   key: jwt_secret
+            - name: APP_LABEL
+              value: travelstory-backend
           readinessProbe:
             httpGet:
               path: /health
