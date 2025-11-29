@@ -362,24 +362,14 @@ spec:
 
                         kubectl get ns 2401149 || kubectl create ns 2401149
 
-                        # Apply deployments and services
-                        kubectl apply -f k8s/deployment-frontend.yaml -n 2401149
-                        kubectl apply -f k8s/deployment-backend.yaml -n 2401149
+                        # Apply deployment, services, and ingress
+                        kubectl apply -f k8s/deployment.yaml -n 2401149
                         kubectl apply -f k8s/service.yaml -n 2401149
-                        kubectl apply -f k8s/ingress.yaml -n 2401149
 
-                        echo "Waiting for frontend rollout..."
-                        if ! kubectl rollout status deployment/travelstory-frontend-deployment -n 2401149 --timeout=300s; then
-                            echo "Frontend rollout failed. Rolling back..."
-                            kubectl rollout undo deployment/travelstory-frontend-deployment -n 2401149
-                            kubectl get pods -n 2401149
-                            exit 1
-                        fi
-
-                        echo "Waiting for backend rollout..."
-                        if ! kubectl rollout status deployment/travelstory-backend-deployment -n 2401149 --timeout=300s; then
-                            echo "Backend rollout failed. Rolling back..."
-                            kubectl rollout undo deployment/travelstory-backend-deployment -n 2401149
+                        echo "Waiting for deployment rollout..."
+                        if ! kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s; then
+                            echo "Rollout failed. Rolling back..."
+                            kubectl rollout undo deployment/travelstory-deployment -n 2401149
                             kubectl get pods -n 2401149
                             exit 1
                         fi
