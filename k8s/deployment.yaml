@@ -8,6 +8,11 @@ spec:
   selector:
     matchLabels:
       app: travelstory
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0   # ensures new pod comes up before old pod terminates
+      maxSurge: 1
   template:
     metadata:
       labels:
@@ -52,7 +57,7 @@ spec:
             httpGet:
               path: /health
               port: 3000
-            initialDelaySeconds: 15   # wait for MongoDB connection
+            initialDelaySeconds: 15  # wait for MongoDB
             periodSeconds: 10
           livenessProbe:
             httpGet:

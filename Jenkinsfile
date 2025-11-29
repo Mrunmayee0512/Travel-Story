@@ -178,6 +178,7 @@ spec:
                         if ! kubectl rollout status deployment/travelstory-deployment -n 2401149 --timeout=300s; then
                             echo "Rollout failed. Rolling back..."
                             kubectl rollout undo deployment/travelstory-deployment -n 2401149
+                            kubectl get pods -n 2401149
                             exit 1
                         fi
 
