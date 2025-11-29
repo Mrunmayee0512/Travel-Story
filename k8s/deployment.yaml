@@ -1,8 +1,57 @@
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: travelstory-deployment
+#   namespace: "2401149"
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: travelstory
+#   template:
+#     metadata:
+#       labels:
+#         app: travelstory
+#     spec:
+#       containers:
+#         - name: travelstory-frontend
+#           image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
+#           ports:
+#             - containerPort: 8080
+#           readinessProbe:
+#             httpGet:
+#               path: /health
+#               port: 8080
+#             initialDelaySeconds: 5
+#             periodSeconds: 10
+#           livenessProbe:
+#             httpGet:
+#               path: /health
+#               port: 8080
+#             initialDelaySeconds: 10
+#             periodSeconds: 20
+
+#         - name: travelstory-backend
+#           image: 127.0.0.1:30085/2401149/travelstory-backend:v1
+#           ports:
+#             - containerPort: 8081
+#           readinessProbe:
+#             httpGet:
+#               path: /health
+#               port: 8081
+#             initialDelaySeconds: 5
+#             periodSeconds: 10
+#           livenessProbe:
+#             httpGet:
+#               path: /health
+#               port: 8081
+#             initialDelaySeconds: 10
+#             periodSeconds: 20
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: travelstory-deployment
-  namespace: "2401149"
+  namespace: 2401149
 spec:
   replicas: 1
   selector:
@@ -13,37 +62,51 @@ spec:
       labels:
         app: travelstory
     spec:
+      imagePullSecrets:
+        - name: nexus-credentials
       containers:
+
         - name: travelstory-frontend
-          image: 127.0.0.1:30085/2401149/travelstory-frontend:v1
+          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-frontend:v1
           ports:
-            - containerPort: 8080
+            - containerPort: 80
           readinessProbe:
             httpGet:
-              path: /health
-              port: 8080
+              path: /
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 10
+              path: /
+              port: 80
+            initialDelaySeconds: 20
             periodSeconds: 20
 
         - name: travelstory-backend
-          image: 127.0.0.1:30085/2401149/travelstory-backend:v1
+          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401149/travelstory-backend:v1
+          env:
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  name: travelstory-secret
+                  key: mongo_url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: travelstory-secret
+                  key: jwt_secret
           ports:
             - containerPort: 8081
           readinessProbe:
             httpGet:
               path: /health
               port: 8081
-            initialDelaySeconds: 5
+            initialDelaySeconds: 8
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: 8081
-            initialDelaySeconds: 10
+            initialDelaySeconds: 20
             periodSeconds: 20
