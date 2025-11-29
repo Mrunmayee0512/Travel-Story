@@ -1,7 +1,8 @@
+# Frontend Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: travelstory-service
+  name: travelstory-frontend-service
   namespace: "2401149"
 spec:
   selector:
@@ -9,9 +10,27 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8080
+      targetPort: 80
   type: ClusterIP
+
 ---
+# Backend Service (internal)
+apiVersion: v1
+kind: Service
+metadata:
+  name: travelstory-backend-service
+  namespace: "2401149"
+spec:
+  selector:
+    app: travelstory
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP
+
+---
+# Frontend Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -29,6 +48,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: travelstory-service
+                name: travelstory-frontend-service
                 port:
                   number: 80
