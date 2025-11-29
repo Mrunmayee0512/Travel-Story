@@ -55,6 +55,9 @@
 # ============================
 # FRONTEND SERVICE
 # ============================
+# ============================
+# FRONTEND SERVICE
+# ============================
 apiVersion: v1
 kind: Service
 metadata:
@@ -63,7 +66,7 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app: travelstory-frontend
+    app: travelstory   # matches pod label
   ports:
     - port: 80
       targetPort: 80
@@ -81,7 +84,7 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app: travelstory-backend
+    app: travelstory   # matches pod label
   ports:
     - port: 3000
       targetPort: 3000

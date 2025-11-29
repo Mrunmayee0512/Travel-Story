@@ -78,7 +78,7 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0   # ensures new pod starts before old one terminates
+      maxUnavailable: 0
       maxSurge: 1
   template:
     metadata:
@@ -105,10 +105,6 @@ spec:
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 20
-          # add label for service selector
-          env:
-            - name: APP_LABEL
-              value: travelstory-frontend
 
         # ---------------- BACKEND ----------------
         - name: travelstory-backend
@@ -126,13 +122,11 @@ spec:
                 secretKeyRef:
                   name: travelstory-secret
                   key: jwt_secret
-            - name: APP_LABEL
-              value: travelstory-backend
           readinessProbe:
             httpGet:
               path: /health
               port: 3000
-            initialDelaySeconds: 15   # wait for MongoDB connection
+            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
